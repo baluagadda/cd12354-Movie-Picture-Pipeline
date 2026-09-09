@@ -6,13 +6,13 @@ on:
       - main
     paths:
       - "starter/frontend/**"
+      - ".github/workflows/frontend-ci.yaml"
   workflow_dispatch:
 
 jobs:
   lint:
     name: Lint Frontend
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: starter/frontend
@@ -21,12 +21,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup NodeJS
         uses: actions/setup-node@v4
         with:
           node-version-file: starter/frontend/.nvmrc
-          cache: npm
-          cache-dependency-path: starter/frontend/package-lock.json
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: starter/frontend/node_modules
+          key: frontend-node-modules-${{ runner.os }}-${{ hashFiles('starter/frontend/package-lock.json') }}
+          restore-keys: |
+            frontend-node-modules-${{ runner.os }}-
 
       - name: Install dependencies
         run: npm ci
@@ -37,7 +43,6 @@ jobs:
   test:
     name: Test Frontend
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: starter/frontend
@@ -46,20 +51,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup NodeJS
         uses: actions/setup-node@v4
         with:
           node-version-file: starter/frontend/.nvmrc
-          cache: npm
-          cache-dependency-path: starter/frontend/package-lock.json
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: starter/frontend/node_modules
+          key: frontend-node-modules-${{ runner.os }}-${{ hashFiles('starter/frontend/package-lock.json') }}
+          restore-keys: |
+            frontend-node-modules-${{ runner.os }}-
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run tests
-        run: npm test -- --watchAll=false
-        env:
-          CI: true
+        run: npm run test -- --watchAll=false --ci
 
   build:
     name: Build Frontend
@@ -67,14 +76,32 @@ jobs:
     needs:
       - lint
       - test
+    defaults:
+      run:
+        working-directory: starter/frontend
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup NodeJS
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: starter/frontend/.nvmrc
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: starter/frontend/node_modules
+          key: frontend-node-modules-${{ runner.os }}-${{ hashFiles('starter/frontend/package-lock.json') }}
+          restore-keys: |
+            frontend-node-modules-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test -- --watchAll=false --ci
+
       - name: Build Docker image
-        working-directory: starter/frontend
-        run: |
-          docker build \
-            --build-arg REACT_APP_MOVIE_API_URL="${{ vars.REACT_APP_MOVIE_API_URL }}" \
-            -t movie-frontend:${{ github.sha }} .
+        run: docker build -t frontend .
