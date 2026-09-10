@@ -5,8 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "starter/frontend/**"
-      - ".github/workflows/frontend-cd.yaml"
+      - 'starter/frontend/**'
   workflow_dispatch:
 
 env:
@@ -14,59 +13,68 @@ env:
   ECR_REGISTRY: 828239945665.dkr.ecr.us-east-1.amazonaws.com
   ECR_REPOSITORY: frontend
   EKS_CLUSTER_NAME: cluster
-  ECR_REGISTRY: 828239945665.dkr.ecr.us-east-1.amazonaws.com
-  REACT_APP_MOVIE_API_URL: ${{ secrets.REACT_APP_MOVIE_API_URL }}
+  REACT_APP_MOVIE_API_URL: http://a9b2e9aefa5fa4fd8a455c911b1a60f5-931565152.us-east-1.elb.amazonaws.com
 
 jobs:
   lint:
     name: Lint Frontend
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: starter/frontend
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup NodeJS
         uses: actions/setup-node@v4
         with:
-          node-version-file: starter/frontend/.nvmrc
-          cache: npm
-          cache-dependency-path: starter/frontend/package-lock.json
+          node-version: 18
+
+      - name: Perform a cache action to restore cache before dependency install
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('starter/frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run lint
+      - name: Run the npm run lint command
         run: npm run lint
 
   test:
     name: Test Frontend
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: starter/frontend
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup NodeJS
         uses: actions/setup-node@v4
         with:
-          node-version-file: starter/frontend/.nvmrc
-          cache: npm
-          cache-dependency-path: starter/frontend/package-lock.json
+          node-version: 18
+
+      - name: Perform a cache action to restore cache before dependency install
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('starter/frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test -- --watchAll=false --ci
+      - name: Run the npm run test command
+        env:
+          CI: true
+        run: npm run test
 
   build:
     name: Build & Push Frontend Image
@@ -93,9 +101,8 @@ jobs:
       - name: Build, tag, and push Docker image
         env:
           IMAGE_TAG: ${{ github.sha }}
-          REACT_APP_MOVIE_API_URL: http://a9b2e9aefa5fa4fd8a455c911b1a60f5-931565152.us-east-1.elb.amazonaws.com
         run: |
-          docker build --build-arg=REACT_APP_MOVIE_API_URL=$REACT_APP_MOVIE_API_URL \
+          docker build --build-arg=REACT_APP_MOVIE_API_URL=${{ env.REACT_APP_MOVIE_API_URL }} \
             -t ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG \
             -t ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest .
           docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
